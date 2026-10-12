@@ -9,9 +9,9 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 
-# ==========================================
-# 1. 创建测试 SQLite 数据库
-# ==========================================
+# ==============================
+# 1. 创建临时 SQLite
+# ==============================
 
 test_engine = create_engine(
     "sqlite://",
@@ -29,9 +29,10 @@ TestingSessionLocal = sessionmaker(
 )
 
 
-# ==========================================
-# 2. 覆盖 FastAPI 数据库依赖
-# ==========================================
+
+# ==============================
+# 2. 创建测试数据库依赖
+# ==============================
 
 def override_get_db():
 
@@ -44,21 +45,28 @@ def override_get_db():
         db.close()
 
 
-# ==========================================
-# 3. 测试数据库生命周期
-# ==========================================
+
+# ==============================
+# 3. 创建所有测试表
+# ==============================
 
 @pytest.fixture(autouse=True)
 def setup_database():
 
-    # 必须提前导入模型
-    # 让 SQLAlchemy 的 Base.metadata 注册所有表
-    from BizFlow.shujuku import user
+    # 必须导入模型
+    # 让 SQLAlchemy 注册表结构
 
     from BizFlow.shujuku.Management import Base
 
+    from BizFlow.shujuku.user import (
+        users,
+        task,
+        yg_tjs
+    )
 
-    # 创建 SQLite 临时表
+
+    # 创建所有表
+
     Base.metadata.create_all(
         bind=test_engine
     )
@@ -67,15 +75,17 @@ def setup_database():
     yield
 
 
-    # 测试结束删除所有表
+    # 测试结束删除
+
     Base.metadata.drop_all(
         bind=test_engine
     )
 
 
-# ==========================================
-# 4. FastAPI 测试客户端
-# ==========================================
+
+# ==============================
+# 4. 测试客户端
+# ==============================
 
 @pytest.fixture
 def client():
@@ -84,18 +94,19 @@ def client():
     from BizFlow.shujuku.Management import get_db
 
 
-    # 保存原来的依赖
-    old_overrides = app.dependency_overrides.copy()
+    old = app.dependency_overrides.copy()
 
 
-    # 替换真实 MySQL 数据库
+    # 替换真实 MySQL
+
     app.dependency_overrides[get_db] = override_get_db
 
 
     test_client = TestClient(
         app,
         headers={
-            "Authorization": "Bearer fake_test_token"
+            "Authorization":
+            "Bearer fake_test_token"
         }
     )
 
@@ -109,28 +120,25 @@ def client():
 
         test_client.close()
 
-
-        # 恢复原来的依赖
         app.dependency_overrides.clear()
 
-        app.dependency_overrides.update(
-            old_overrides
-        )
+        app.dependency_overrides.update(old)
 
 
-# ==========================================
-# 5. 测试时直接操作 SQLite
-# ==========================================
+
+# ==============================
+# 5. 直接操作临时数据库
+# ==============================
 
 @pytest.fixture
 def db_session():
 
-    session = TestingSessionLocal()
+    db = TestingSessionLocal()
 
     try:
 
-        yield session
+        yield db
 
     finally:
 
-        session.close()
+        db.close()
