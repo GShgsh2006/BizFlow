@@ -25,14 +25,14 @@ jobs:
         uses: actions/checkout@v4
 
 
-      # 安装 Python
+      # Python 环境
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
 
-      # 安装项目依赖
+      # 安装依赖
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -40,7 +40,18 @@ jobs:
           pip install pytest pytest-asyncio
 
 
-      # 设置项目根目录，让 Python 可以找到 BizFlow 包
+      # 设置测试环境变量
+      # 防止项目导入数据库配置时因为没有 .env 报错
+      - name: Set test environment
+        run: |
+          echo "HOSTNAME=localhost" >> $GITHUB_ENV
+          echo "PORT=3306" >> $GITHUB_ENV
+          echo "USERNAME=test" >> $GITHUB_ENV
+          echo "PASSWORD=test" >> $GITHUB_ENV
+          echo "DATABASE=test" >> $GITHUB_ENV
+
+
+      # 设置 Python 包搜索路径
       - name: Set PYTHONPATH
         run: |
           echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV
