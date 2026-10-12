@@ -1,45 +1,71 @@
 name: BizFlow CI
 
+
 #什么时候触发
 on:
+
+  # 推送main分支触发
   push:
     branches:
       - main
 
+  # 提交PR到main触发
   pull_request:
     branches:
       - main
 
 
+
 jobs:
+
 
   test:
 
-    #使用github提供的ubuntu机器
+    # GitHub提供的Ubuntu虚拟机
     runs-on: ubuntu-latest
+
 
 
     steps:
 
-      #第一步：拉取你的代码
+
+      # 第一步：拉取代码
       - name: Checkout code
         uses: actions/checkout@v4
 
 
-      #第二步：安装Python
+
+      # 第二步：安装Python环境
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
 
-      #第三步：安装依赖
+
+      # 第三步：安装依赖
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+
+          python -m pip install --upgrade pip
+
+          python -m pip install -r requirements.txt
+
+          # 安装测试工具
+          python -m pip install pytest pytest-asyncio
 
 
-      #第四步：执行测试
+
+      # 第四步：设置Python路径
+      # 防止找不到BizFlow包
+      - name: Set PYTHONPATH
+        run: |
+          echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV
+
+
+
+      # 第五步：执行测试
       - name: Run tests
         run: |
-          pytest
+
+          python -m pytest
