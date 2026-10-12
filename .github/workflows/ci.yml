@@ -1,9 +1,7 @@
 name: BizFlow CI
 
-
 #什么时候触发
 on:
-
   # 推送main分支触发
   push:
     branches:
@@ -14,26 +12,15 @@ on:
     branches:
       - main
 
-
-
 jobs:
-
-
   test:
-
     # GitHub提供的Ubuntu虚拟机
     runs-on: ubuntu-latest
 
-
-
     steps:
-
-
       # 第一步：拉取代码
       - name: Checkout code
         uses: actions/checkout@v4
-
-
 
       # 第二步：安装Python环境
       - name: Set up Python
@@ -41,31 +28,30 @@ jobs:
         with:
           python-version: "3.12"
 
-
-
       # 第三步：安装依赖
       - name: Install dependencies
         run: |
-
           python -m pip install --upgrade pip
-
           python -m pip install -r requirements.txt
-
           # 安装测试工具
           python -m pip install pytest pytest-asyncio
 
-
-
-      # 第四步：设置Python路径
-      # 防止找不到BizFlow包
+      # 第四步：设置Python路径（防止找不到BizFlow包）
       - name: Set PYTHONPATH
         run: |
           echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV
 
+      # ✅ 第五步：为 CI 生成虚拟的 .env 文件（防止 RuntimeError）
+      - name: Create dummy .env for CI
+        run: |
+          echo "HOSTNAME=localhost" > .env
+          echo "PORT=3306" >> .env
+          echo "USERNAME=root" >> .env
+          echo "PASSWORD=root" >> .env
+          echo "DATABASE=test_db" >> .env
+          echo "SECRET_KEY=ci_test_secret_key" >> .env
 
-
-      # 第五步：执行测试
+      # ✅ 第六步：执行测试（明确指定目录并开启 verbose）
       - name: Run tests
         run: |
-
-          python -m pytest
+          python -m pytest BizFlow/hdwj/test_pytext -v
