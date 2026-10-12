@@ -1,0 +1,39 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # 数据库连接（确保密码和下面 mysql 里的完全一致）
+      - HOSTNAME=mysql
+      - PORT=3306
+      - USERNAME=root
+      - PASSWORD=12345678
+      - DATABASE=fastapi_sjk
+      - DATABASE_URL=mysql+pymysql://root:12345678@mysql:3306/fastapi_sjk?charset=utf8mb4
+      # 🚨 关键：解决 HuggingFace 下载失败
+      - HF_ENDPOINT=https://hf-mirror.com
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: 12345678  # 🚨 密码必须和上面一模一样
+      MYSQL_DATABASE: fastapi_sjk    # 🚨 数据库名也要一致
+    ports:
+      - "3308:3306"                  # 本地依旧用 3308 连接
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p12345678"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  mysql_data:
