@@ -114,21 +114,14 @@ jobs:
       # 生成.env
 
       - name: Create .env
-
         run: |
-
           echo "HOSTNAME=127.0.0.1" > .env
-
           echo "PORT=3306" >> .env
-
           echo "USERNAME=root" >> .env
-
           echo "PASSWORD=root" >> .env
-
           echo "DATABASE=test_db" >> .env
-
+          echo "DATABASE_URL=mysql+pymysql://root:root@127.0.0.1:3306/test_db?charset=utf8mb4" >> .env
           echo "SECRET_KEY=ci_test_secret_key" >> .env
-
 
 
 
