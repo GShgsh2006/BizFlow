@@ -29,7 +29,6 @@ TestingSessionLocal = sessionmaker(
 )
 
 
-
 # ==========================================
 # 2. 覆盖 FastAPI 数据库依赖
 # ==========================================
@@ -45,7 +44,6 @@ def override_get_db():
         db.close()
 
 
-
 # ==========================================
 # 3. 测试数据库生命周期
 # ==========================================
@@ -53,10 +51,14 @@ def override_get_db():
 @pytest.fixture(autouse=True)
 def setup_database():
 
+    # 必须提前导入模型
+    # 让 SQLAlchemy 的 Base.metadata 注册所有表
+    from BizFlow.shujuku import user
+
     from BizFlow.shujuku.Management import Base
 
 
-    # 创建测试表
+    # 创建 SQLite 临时表
     Base.metadata.create_all(
         bind=test_engine
     )
@@ -65,11 +67,10 @@ def setup_database():
     yield
 
 
-    # 删除测试表
+    # 测试结束删除所有表
     Base.metadata.drop_all(
         bind=test_engine
     )
-
 
 
 # ==========================================
@@ -83,13 +84,12 @@ def client():
     from BizFlow.shujuku.Management import get_db
 
 
-    # 保存原来的依赖覆盖
+    # 保存原来的依赖
     old_overrides = app.dependency_overrides.copy()
 
 
-    # 替换真实数据库
+    # 替换真实 MySQL 数据库
     app.dependency_overrides[get_db] = override_get_db
-
 
 
     test_client = TestClient(
@@ -118,9 +118,8 @@ def client():
         )
 
 
-
 # ==========================================
-# 5. 测试时直接操作数据库
+# 5. 测试时直接操作 SQLite
 # ==========================================
 
 @pytest.fixture
@@ -128,11 +127,9 @@ def db_session():
 
     session = TestingSessionLocal()
 
-
     try:
 
         yield session
-
 
     finally:
 
