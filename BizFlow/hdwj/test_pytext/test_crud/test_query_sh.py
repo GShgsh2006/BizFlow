@@ -1,29 +1,26 @@
-#管理员审核测试
+# 管理员审核测试
+# 文件名请保持为 test_query_sh.py
 
 import pytest
 from datetime import datetime
 
 from BizFlow.shujuku.user import users
-from BizFlow.shujuku.user import yg_tjs   # 改成你实际的模块路径
-from BizFlow.hdwj.pytext.tools.shujuku import client, TestingSessionLocal
+from BizFlow.shujuku.user import yg_tjs  # 改成你实际的模块路径
+
+# ✅ 关键1：统一导入 client 和 db_session
+from BizFlow.hdwj.test_pytext.test_tools.test_shujuku import client, db_session
 
 # 你的业务函数导入
-from BizFlow.hdwj.function.sign_in_ly import sign_yz, CHAIRMAN_KEY       # 董事长注册
-from BizFlow.hdwj.tool.sc_token import create_token                # 生成 token
-# query_sh 是路由里的函数，测试走 HTTP，不需要直接导入
+from BizFlow.hdwj.function.sign_in_ly import sign_yz, CHAIRMAN_KEY  # 董事长注册
+from BizFlow.hdwj.tool.sc_token import create_token  # 生成 token
 
 QUERY_SH_URL = "/query_sh_ly"
 
 
-@pytest.fixture
-def db_session(client):
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# ✅ 关键2：删除了这里重复定义的 @pytest.fixture db_session
 
 
+# ✅ 关键3：参数统一改为 client
 def test_query_sh_chairman_can_see_pending(client, db_session):
     """董事长带合法 token 查询，能看到审核中的任务"""
 
@@ -46,17 +43,18 @@ def test_query_sh_chairman_can_see_pending(client, db_session):
 
     # 3. 造一条"审核中"的任务
     task = yg_tjs(
-        name="chairman_test",  # 或别的标识
+        name="chairman_test",
         name_rw="测试任务-审核中",
         content="这是一条测试任务内容",
-        assignee_id=900001,  # 和你注册的董事长工号/员工 id 对应
+        assignee_id=900001,
         zt="审核中",
     )
     db_session.add(task)
     db_session.commit()
     db_session.refresh(task)
+
     # 4. 带 token 调接口
-    response = client.get(
+    response = client.get(  # ✅ client
         QUERY_SH_URL,
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -68,17 +66,15 @@ def test_query_sh_chairman_can_see_pending(client, db_session):
     assert all(item["zt"] == "审核中" for item in data)
 
 
-def test_query_sh_employee_forbidden(client, db_session):
+def test_query_sh_employee_forbidden(client, db_session):  # ✅ 参数改为 client
     """员工 token 查审核 → 403"""
 
-    # 直接用注册接口造一个员工（role 不是董事长）
-    # 或者直接往 db_session 塞一个也行
     token = create_token({
         "username": "some_employee",
         "role": "员工",
     })
 
-    response = client.get(
+    response = client.get(  # ✅ client
         QUERY_SH_URL,
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -86,17 +82,17 @@ def test_query_sh_employee_forbidden(client, db_session):
     assert "无权" in response.json()["detail"]
 
 
-def test_query_sh_no_token(client):
+def test_query_sh_no_token(client):  # ✅ 参数改为 client
     """不带 token → 401"""
 
-    response = client.get(QUERY_SH_URL)
+    response = client.get(QUERY_SH_URL)  # ✅ client
     assert response.status_code == 401
 
 
-def test_query_sh_bad_token(client):
+def test_query_sh_bad_token(client):  # ✅ 参数改为 client
     """token 伪造 → 401"""
 
-    response = client.get(
+    response = client.get(  # ✅ client
         QUERY_SH_URL,
         headers={"Authorization": "Bearer not.a.real.token"},
     )

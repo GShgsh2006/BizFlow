@@ -1,22 +1,11 @@
-#注册测试
+# BizFlow/hdwj/test_pytext/test_sign/test_register.py 或对应路径
 import pytest
-
-from BizFlow.hdwj.pytext.tools.shujuku import client,TestingSessionLocal
-# 5. 提供测试数据库会话，供测试函数查询数据
-@pytest.fixture
-def db_session(client):
-    db = TestingSessionLocal()
-    try:
-        
-        yield db
-    finally:
-        db.close()
-# tests/test_register.py
-
 import bcrypt
 
 from BizFlow.shujuku.user import users
 
+# ✅ 关键1：从上一个文件中导入统一的 client 和 db_session
+from BizFlow.hdwj.test_pytext.test_tools.test_shujuku import client, db_session
 
 # 改成你的注册接口实际完整路由
 REGISTER_URL = "/sign_up"
@@ -32,6 +21,7 @@ def get_register_data():
     }
 
 
+# ✅ 关键2：参数统一为 client
 def test_register_success(client, db_session):
     """测试注册成功，并检查数据库中是否真的保存了用户。"""
 

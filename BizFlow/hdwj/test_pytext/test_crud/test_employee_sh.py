@@ -1,31 +1,25 @@
-#员工提交审核表测试文件
-# tests/test_employee_sh_http.py
+# 员工提交审核表测试文件
+# 文件名请务必保持为 test_employee_sh_http.py
+
 import random
-
 import pytest
+from passlib.context import CryptContext
 
-from BizFlow.shujuku.user import yg_tjs
-from BizFlow.hdwj.pytext.tools.shujuku import client, TestingSessionLocal
+from BizFlow.shujuku.user import yg_tjs, users
+from BizFlow.hdwj.function.sign_in_ly import sign_yz, CHAIRMAN_KEY
+from BizFlow.hdwj.tool.sc_token import create_token
 
-from BizFlow.hdwj.function.sign_in_ly import sign_yz, CHAIRMAN_KEY       # 董事长注册
-from BizFlow.hdwj.tool.sc_token import create_token                   # 生成 token
+# ✅ 关键1：从刚才修正的 test_shujuku.py 中导入标准的 client 和 db_session
+from BizFlow.hdwj.test_pytext.test_tools.test_shujuku import client, db_session
 
+EMPLOYEE_URL = "/Employee"  # 按你 app.include_router 的前缀改
 
-EMPLOYEE_URL = "/Employee"                  # 按你 app.include_router 的前缀改
-
-
-# ----------------------------------------------------------
-@pytest.fixture
-def db_session(client):
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# 密码加密上下文（全局放一个就行）
+pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 # ----------------------------------------------------------
-# helper
+# helper 辅助函数
 # ----------------------------------------------------------
 def _make_user_and_token(db, role="员工"):
     """
@@ -46,10 +40,7 @@ def _make_user_and_token(db, role="员工"):
             db=db,
         )
     else:
-        # 如果你有普通注册接口，用它；没有就直接塞 users 表
-        from BizFlow.shujuku.user import users
-        from passlib.context import CryptContext
-        pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        # 直接塞 users 表
         db.add(users(
             name=name,
             password=pwd_ctx.hash("EmpPass123!"),
@@ -58,6 +49,7 @@ def _make_user_and_token(db, role="员工"):
         ))
         db.commit()
 
+    # 生成 token
     token = create_token({"username": name, "role": role})
     return name, emp_id, token
 
@@ -78,13 +70,13 @@ def _body(name, task_name, content, assignee_id):
 # ----------------------------------------------------------
 # 主路径：提交成功
 # ----------------------------------------------------------
-def test_employee_sh_http_success(client, db_session):
+def test_employee_sh_http_success(client, db_session):  # ✅ 参数统一为 client
     name, emp_id, token = _make_user_and_token(db_session, role="员工")
 
     task_name = f"task_{random.randint(100000, 999999)}"
     content = "这是员工提交的任务内容"
 
-    resp = client.post(
+    resp = client.post(  # ✅ client
         EMPLOYEE_URL,
         json=_body(name=name, task_name=task_name, content=content, assignee_id=emp_id),
         headers=_auth(token),
@@ -104,13 +96,13 @@ def test_employee_sh_http_success(client, db_session):
     assert saved.name_rw == task_name
     assert saved.content == content
     assert saved.assignee_id == emp_id
-    assert saved.zt == "审核中"      # 关键断言
+    assert saved.zt == "审核中"  # 关键断言
 
 
 # ----------------------------------------------------------
 # 无 token → 401
 # ----------------------------------------------------------
-def test_employee_sh_http_no_token(client):
+def test_employee_sh_http_no_token(client):  # ✅ 参数统一为 client
     resp = client.post(
         EMPLOYEE_URL,
         json=_body(name="x", task_name="y", content="z", assignee_id=1),
@@ -121,7 +113,7 @@ def test_employee_sh_http_no_token(client):
 # ----------------------------------------------------------
 # 非法 token → 401
 # ----------------------------------------------------------
-def test_employee_sh_http_bad_token(client):
+def test_employee_sh_http_bad_token(client):  # ✅ 参数统一为 client
     resp = client.post(
         EMPLOYEE_URL,
         json=_body(name="x", task_name="y", content="z", assignee_id=1),
@@ -133,12 +125,12 @@ def test_employee_sh_http_bad_token(client):
 # ----------------------------------------------------------
 # body 缺字段 → 422（FastAPI/Pydantic 自动校验）
 # ----------------------------------------------------------
-def test_employee_sh_http_missing_field(client, db_session):
+def test_employee_sh_http_missing_field(client, db_session):  # ✅ 参数统一为 client
     _, _, token = _make_user_and_token(db_session, role="员工")
 
     resp = client.post(
         EMPLOYEE_URL,
-        json={"name": "x", "task_name": "y"},   # 缺 content 和 id
+        json={"name": "x", "task_name": "y"},  # 缺 content 和 id
         headers=_auth(token),
     )
     assert resp.status_code == 422
@@ -147,13 +139,12 @@ def test_employee_sh_http_missing_field(client, db_session):
 # ----------------------------------------------------------
 # body 字段类型错 → 422
 # ----------------------------------------------------------
-def test_employee_sh_http_wrong_type(client, db_session):
+def test_employee_sh_http_wrong_type(client, db_session):  # ✅ 参数统一为 client
     _, _, token = _make_user_and_token(db_session, role="员工")
 
     resp = client.post(
         EMPLOYEE_URL,
-        json={"id": "not-an-int", "name": "x",
-              "task_name": "y", "content": "z"},
+        json={"id": "not-an-int", "name": "x", "task_name": "y", "content": "z"},
         headers=_auth(token),
     )
     assert resp.status_code == 422
@@ -162,7 +153,7 @@ def test_employee_sh_http_wrong_type(client, db_session):
 # ----------------------------------------------------------
 # 可多次提交：同一 task_name 会新增多条记录（目前没唯一约束）
 # ----------------------------------------------------------
-def test_employee_sh_http_duplicate_task_name(client, db_session):
+def test_employee_sh_http_duplicate_task_name(client, db_session):  # ✅ 参数统一为 client
     name, emp_id, token = _make_user_and_token(db_session, role="员工")
     task_name = f"task_{random.randint(100000, 999999)}"
 
@@ -179,4 +170,4 @@ def test_employee_sh_http_duplicate_task_name(client, db_session):
         .filter(yg_tjs.name_rw == task_name)
         .count()
     )
-    assert cnt == 2        # 说明现在没有唯一性约束
+    assert cnt == 2  # 说明现在没有唯一性约束

@@ -1,34 +1,28 @@
-#管理员同意测试文件
-# tests/test_gly_sh_http.py
+# 管理员同意测试文件
+# 文件名请保持为 test_gly_sh_http.py
+
 import random
 from datetime import datetime, timedelta
 
 import pytest
 
-from BizFlow.shujuku.user import task
-from BizFlow.shujuku.user import yg_tjs
-from BizFlow.hdwj.pytext.tools.shujuku import client, TestingSessionLocal
+from BizFlow.shujuku.user import task, yg_tjs
+# ✅ 关键1：从统一的 test_shujuku.py 导入标准的 client 和 db_session
+from BizFlow.hdwj.test_pytext.test_tools.test_shujuku import client, db_session
 
-from BizFlow.hdwj.function.sign_in_ly import sign_yz, CHAIRMAN_KEY       # 董事长注册
-from BizFlow.hdwj.tool.sc_token import create_token                   # 生成 token
+from BizFlow.hdwj.function.sign_in_ly import sign_yz, CHAIRMAN_KEY  # 董事长注册
+from BizFlow.hdwj.tool.sc_token import create_token  # 生成 token
 
-# 改成你实际注册路由的文件路径
-# 例如：from BizFlow.router.user import router
-GLY_SH_URL = "/gly_sh_ly"                  # 确认 router 前缀是否包含在 app.include_router 里
-
+# 确认 router 前缀是否包含在 app.include_router 里
+GLY_SH_URL = "/gly_sh_ly"
 
 # ----------------------------------------------------------
-@pytest.fixture
-def db_session(client):
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
+# 注意：删除了这里原有的 db_session fixture 定义。
+# 因为 test_shujuku.py 已经全局定义了标准的 db_session，pytest 会自动注入。
+# ----------------------------------------------------------
 
 # ----------------------------------------------------------
-# helper
+# helper 辅助函数
 # ----------------------------------------------------------
 def _make_chairman(db):
     """注册董事长，返回 (name, employee_id, token)"""
@@ -88,12 +82,12 @@ def _auth_headers(token):
 # ----------------------------------------------------------
 # 阶段一：通过审核
 # ----------------------------------------------------------
-def test_gly_sh_http_pass(client, db_session):
+def test_gly_sh_http_pass(client, db_session):  # ✅ 参数统一为 client
     name, emp, token = _make_chairman(db_session)
     y, t = _make_task_pair(db_session, chairman_name=name, assignee_id=emp)
 
     # 走 HTTP
-    resp = client.get(
+    resp = client.get(  # ✅ client
         f"{GLY_SH_URL}/{y.id}",
         params={"querya": "通过审核"},
         headers=_auth_headers(token),
@@ -112,11 +106,11 @@ def test_gly_sh_http_pass(client, db_session):
 # ----------------------------------------------------------
 # 阶段二：审核不通过
 # ----------------------------------------------------------
-def test_gly_sh_http_reject(client, db_session):
+def test_gly_sh_http_reject(client, db_session):  # ✅ 参数统一为 client
     name, emp, token = _make_chairman(db_session)
     y, t = _make_task_pair(db_session, chairman_name=name, assignee_id=emp)
 
-    resp = client.get(
+    resp = client.get(  # ✅ client
         f"{GLY_SH_URL}/{y.id}",
         params={"querya": "审核不通过"},
         headers=_auth_headers(token),
@@ -134,16 +128,16 @@ def test_gly_sh_http_reject(client, db_session):
 # ----------------------------------------------------------
 # 反向用例
 # ----------------------------------------------------------
-def test_gly_sh_http_no_token(client, db_session):
+def test_gly_sh_http_no_token(client, db_session):  # ✅ 参数统一为 client
     """不带 token → 401"""
     name, emp, _ = _make_chairman(db_session)
     y, _ = _make_task_pair(db_session, chairman_name=name, assignee_id=emp)
 
-    resp = client.get(f"{GLY_SH_URL}/{y.id}", params={"querya": "通过审核"})
+    resp = client.get(f"{GLY_SH_URL}/{y.id}", params={"querya": "通过审核"})  # ✅ client
     assert resp.status_code == 401
 
 
-def test_gly_sh_http_wrong_role(client, db_session):
+def test_gly_sh_http_wrong_role(client, db_session):  # ✅ 参数统一为 client
     """员工 token → 403"""
     # 只造 yg_tjs，够走到权限检查即可
     y = yg_tjs(name="x", name_rw="y", content="z",
@@ -153,7 +147,7 @@ def test_gly_sh_http_wrong_role(client, db_session):
     db_session.refresh(y)
 
     token = create_token({"username": "emp", "role": "员工"})
-    resp = client.get(
+    resp = client.get(  # ✅ client
         f"{GLY_SH_URL}/{y.id}",
         params={"querya": "通过审核"},
         headers=_auth_headers(token),
@@ -162,12 +156,12 @@ def test_gly_sh_http_wrong_role(client, db_session):
     assert "无权" in resp.json()["detail"]
 
 
-def test_gly_sh_http_bad_query(client, db_session):
+def test_gly_sh_http_bad_query(client, db_session):  # ✅ 参数统一为 client
     """query 不合法 → 400"""
     name, emp, token = _make_chairman(db_session)
     y, _ = _make_task_pair(db_session, chairman_name=name, assignee_id=emp)
 
-    resp = client.get(
+    resp = client.get(  # ✅ client
         f"{GLY_SH_URL}/{y.id}",
         params={"querya": "随便写"},
         headers=_auth_headers(token),
@@ -175,11 +169,11 @@ def test_gly_sh_http_bad_query(client, db_session):
     assert resp.status_code == 400
 
 
-def test_gly_sh_http_task_not_found(client, db_session):
+def test_gly_sh_http_task_not_found(client, db_session):  # ✅ 参数统一为 client
     """task_id 不存在 → 404"""
     name, emp, token = _make_chairman(db_session)
 
-    resp = client.get(
+    resp = client.get(  # ✅ client
         f"{GLY_SH_URL}/99999999",
         params={"querya": "通过审核"},
         headers=_auth_headers(token),
@@ -187,7 +181,7 @@ def test_gly_sh_http_task_not_found(client, db_session):
     assert resp.status_code == 404
 
 
-def test_gly_sh_http_rw_not_found(client, db_session):
+def test_gly_sh_http_rw_not_found(client, db_session):  # ✅ 参数统一为 client
     """yg_tjs 有，但 task 表里没有对应 name_rw → 404"""
     name, emp, token = _make_chairman(db_session)
 
@@ -202,7 +196,7 @@ def test_gly_sh_http_rw_not_found(client, db_session):
     db_session.commit()
     db_session.refresh(y)
 
-    resp = client.get(
+    resp = client.get(  # ✅ client
         f"{GLY_SH_URL}/{y.id}",
         params={"querya": "通过审核"},
         headers=_auth_headers(token),
