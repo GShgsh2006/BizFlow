@@ -2,7 +2,6 @@ name: BizFlow CI
 
 
 on:
-
   push:
     branches:
       - main
@@ -12,7 +11,6 @@ on:
       - main
 
 
-
 jobs:
 
   test:
@@ -20,128 +18,35 @@ jobs:
     runs-on: ubuntu-latest
 
 
-    # CI环境变量
-    env:
-
-      HOSTNAME: 127.0.0.1
-      PORT: 3306
-      USERNAME: root
-      PASSWORD: root
-      DATABASE: test_db
-      SECRET_KEY: ci_test_secret_key
-
-
-
-    # 自动创建MySQL
-    services:
-
-      mysql:
-
-        image: mysql:8.0
-
-        env:
-
-          MYSQL_ROOT_PASSWORD: root
-
-          MYSQL_DATABASE: test_db
-
-
-        ports:
-
-          - 3306:3306
-
-
-        options: >-
-          --health-cmd="mysqladmin ping -h localhost -uroot -proot"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
-
-
-
     steps:
-
 
       # 拉取代码
       - name: Checkout code
-
         uses: actions/checkout@v4
 
 
-
-
       # Python环境
-
       - name: Set up Python
-
         uses: actions/setup-python@v5
-
         with:
-
           python-version: "3.12"
 
 
-
-
       # 安装依赖
-
       - name: Install dependencies
-
         run: |
-
           python -m pip install --upgrade pip
-
-          python -m pip install -r requirements.txt
-
-          python -m pip install pytest pytest-asyncio
+          pip install -r BizFlow/requirements.txt
+          pip install pytest pytest-asyncio
 
 
-
-
-      # 设置Python路径
-
+      # 设置Python搜索路径
       - name: Set PYTHONPATH
-
         run: |
-
           echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV
 
 
-
-
-
-      # 生成.env
-
-      - name: Create .env
-        run: |
-          echo "HOSTNAME=127.0.0.1" > .env
-          echo "PORT=3306" >> .env
-          echo "USERNAME=root" >> .env
-          echo "PASSWORD=root" >> .env
-          echo "DATABASE=test_db" >> .env
-          echo "DATABASE_URL=mysql+pymysql://root:root@127.0.0.1:3306/test_db?charset=utf8mb4" >> .env
-          echo "SECRET_KEY=ci_test_secret_key" >> .env
-
-
-
-
-      # 数据库迁移
-
-      - name: Run database migration
-
-        run: |
-
-          alembic upgrade head
-
-
-
-
-
       # 执行测试
-
       - name: Run tests
-
         run: |
-
           python -m pytest BizFlow/hdwj/test_pytext -v
