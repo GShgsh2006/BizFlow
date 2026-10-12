@@ -1,24 +1,26 @@
 # BizFlow/hdwj/test_pytext/tools/test_shujuku.py
 
 import pytest
+
 from fastapi.testclient import TestClient
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from BizFlow.hdwj.app import app
-from BizFlow.shujuku.Management import Base, get_db
-
 
 # ==========================================
-# 1. 创建临时 SQLite 数据库
+# 1. 创建测试 SQLite 数据库
 # ==========================================
 
 test_engine = create_engine(
     "sqlite://",
-    connect_args={"check_same_thread": False},
+    connect_args={
+        "check_same_thread": False
+    },
     poolclass=StaticPool,
 )
+
 
 TestingSessionLocal = sessionmaker(
     bind=test_engine,
@@ -27,62 +29,111 @@ TestingSessionLocal = sessionmaker(
 )
 
 
+
 # ==========================================
-# 2. 测试数据库依赖（普通生成器函数，不能加 test_ 前缀）
+# 2. 覆盖 FastAPI 数据库依赖
 # ==========================================
 
 def override_get_db():
+
     db = TestingSessionLocal()
+
     try:
         yield db
+
     finally:
         db.close()
 
 
+
 # ==========================================
-# 3. 自动建表与销毁表（autouse=True 表示每个测试用例自动执行）
+# 3. 测试数据库生命周期
 # ==========================================
 
 @pytest.fixture(autouse=True)
 def setup_database():
-    Base.metadata.create_all(bind=test_engine)
+
+    from BizFlow.shujuku.Management import Base
+
+
+    # 创建测试表
+    Base.metadata.create_all(
+        bind=test_engine
+    )
+
+
     yield
-    Base.metadata.drop_all(bind=test_engine)
-    test_engine.dispose()
+
+
+    # 删除测试表
+    Base.metadata.drop_all(
+        bind=test_engine
+    )
+
 
 
 # ==========================================
-# 4. 测试客户端（fixture 命名为 client，不能加 test_ 前缀）
+# 4. FastAPI 测试客户端
 # ==========================================
 
 @pytest.fixture
 def client():
+
+    from BizFlow.hdwj.app import app
+    from BizFlow.shujuku.Management import get_db
+
+
+    # 保存原来的依赖覆盖
     old_overrides = app.dependency_overrides.copy()
-    # 将真实的数据库依赖替换为测试用的
+
+
+    # 替换真实数据库
     app.dependency_overrides[get_db] = override_get_db
 
-    # 实例化 TestClient，带上假的 Authorization 头绕过中间件
-    test_client_instance = TestClient(
+
+
+    test_client = TestClient(
         app,
-        headers={"Authorization": "Bearer fake_test_token"},
+        headers={
+            "Authorization": "Bearer fake_test_token"
+        }
     )
 
+
     try:
-        yield test_client_instance
+
+        yield test_client
+
+
     finally:
-        test_client_instance.close()
+
+        test_client.close()
+
+
+        # 恢复原来的依赖
         app.dependency_overrides.clear()
-        app.dependency_overrides.update(old_overrides)
+
+        app.dependency_overrides.update(
+            old_overrides
+        )
+
 
 
 # ==========================================
-# 5. 便捷 fixture：直接拿到测试 session（命名为 db_session）
+# 5. 测试时直接操作数据库
 # ==========================================
 
 @pytest.fixture
 def db_session():
+
     session = TestingSessionLocal()
+
+
     try:
+
         yield session
+
+
     finally:
+
         session.close()

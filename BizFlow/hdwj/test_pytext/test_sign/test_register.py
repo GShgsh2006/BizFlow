@@ -1,13 +1,14 @@
-# BizFlow/hdwj/test_pytext/test_sign/test_register.py 或对应路径
-import pytest
+# BizFlow/hdwj/test_pytext/test_sign/test_register.py
+
 import bcrypt
 
-from BizFlow.shujuku.user import users
+# 从测试工具中导入临时数据库相关 fixture
+from BizFlow.hdwj.test_pytext.test_tools.test_shujuku import (
+    client,
+    db_session,
+)
 
-# ✅ 关键1：从上一个文件中导入统一的 client 和 db_session
-from BizFlow.hdwj.test_pytext.test_tools.test_shujuku import client, db_session
 
-# 改成你的注册接口实际完整路由
 REGISTER_URL = "/sign_up"
 
 
@@ -21,44 +22,46 @@ def get_register_data():
     }
 
 
-# ✅ 关键2：参数统一为 client
 def test_register_success(client, db_session):
-    """测试注册成功，并检查数据库中是否真的保存了用户。"""
+    """测试注册成功，并检查测试数据库中是否保存用户。"""
+
+    # 测试时再导入模型，避免 pytest 收集阶段提前加载数据库
+    from BizFlow.shujuku.user import users
 
     # 第一步：准备注册数据
     data = get_register_data()
 
-    # 第二步：调用原来的注册接口
+    # 第二步：调用注册接口
     response = client.post(
         REGISTER_URL,
         json=data,
     )
 
-    # 第三步：检查 HTTP 响应
+    # 第三步：检查接口响应
     assert response.status_code in (200, 201), (
-        f"注册失败：状态码={response.status_code}，"
+        f"注册失败：状态码={response.status_code}, "
         f"返回内容={response.text}"
     )
 
-    # 第四步：直接查询测试数据库
+    # 第四步：查询测试 SQLite 数据库
     saved_user = (
         db_session.query(users)
         .filter(users.name == data["name"])
         .first()
     )
 
-    # 第五步：检查用户是否真正写入数据库
+    # 第五步：确认用户写入数据库
     assert saved_user is not None
 
-    # 第六步：检查注册信息是否保存正确
+    # 第六步：检查字段
     assert saved_user.name == data["name"]
     assert saved_user.employee_ID == data["employee_ID"]
     assert saved_user.position == data["position"]
 
-    # 第七步：检查数据库存储的密码不是明文
+    # 第七步：检查密码不是明文
     assert saved_user.password != data["password"]
 
-    # 验证数据库中的 bcrypt 哈希确实对应输入的密码
+    # 第八步：验证 bcrypt 哈希
     assert bcrypt.checkpw(
         data["password"].encode("utf-8"),
         saved_user.password.encode("utf-8"),
